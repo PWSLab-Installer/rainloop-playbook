@@ -1,10 +1,7 @@
 ---
 
-    -   name: Create schema for rainloop
-        shell: mysql -u root -p'root' -e "CREATE SCHEMA rainloop DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;"
-
-    -   name: Import schema for rainloop
-        shell: mysql -u root -p'root' rainloop < /var/www/html/rainloop/app/Schema/Sql/mysql.sql
+    # -   name: Create schema for rainloop
+    #     shell: mysql -u root -p'root' -e "CREATE SCHEMA rainloop DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;"
 
     -   name: Create DB User rainloop
         shell: mysql -u root -p'root' -e "CREATE USER 'rainloop'@'localhost' IDENTIFIED BY 'rainloop';"

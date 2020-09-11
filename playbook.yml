@@ -1,0 +1,146 @@
+- hosts: localhost
+  connection: local
+  vars:
+    php_version: '7.4'
+    php_default_version_debian: '7.4'
+    # mysql_databases: 
+    #     - name: rainloop
+    # mysql_users: 
+    #     - name: rainloop
+    #       host: 127.0.0.1
+    #       password: rainloop
+    #       priv: rainloop.*:ALL
+
+    # php_memory_limit: "512M"
+    # php_upload_max_filesize: "256M"
+    # php_post_max_size: "256M"
+    # php_output_buffering: "Off"
+    # php_max_execution_time: "300"
+    # php_date_timezone: "UTC"
+
+    # kanboard_version: 3-9-20
+    # kanboard_dot_version: 3.9.20
+
+  tasks:
+    
+    - name: Check the version of CentOS
+      command: hostnamectl
+      register: os_check
+      ignore_errors: yes
+
+    - name: Fetch Rainloop Role
+      git:
+        repo: https://ro:6aVq2gmsgyshxDUzs7D-@pwslab.org/ansible/rainloop-playbook.git
+        dest: /root/.ansible/roles/pwslab.rainloop
+        version: master
+        force: yes
+    
+    - name: Install Role Apache
+      local_action: command ansible-galaxy install -f geerlingguy.apache 
+
+    - name: Install Role MYSQL
+      local_action: command ansible-galaxy install -f geerlingguy.mysql
+
+    - name: Install Role PHP
+      local_action: command ansible-galaxy install -f geerlingguy.php
+
+    - name: Install Role REMI
+      local_action: command ansible-galaxy install -f geerlingguy.repo-remi 
+
+    - name: Install Role PHP-VERSIONS
+      local_action: command ansible-galaxy install -f geerlingguy.php-versions
+
+    - name: Check if Apache is already installed
+      stat: path=/usr/sbin/httpd
+      register: apache_exists
+
+    - name: Check if PHP is already installed
+      stat: path=/usr/bin/php
+      register: php_exists
+
+    - name: Check if MYSQL is already installed
+      stat: path=/usr/bin/mysql
+      register: mysql_exists
+
+    - name: Applying role Apache
+      command: mv ~/.ansible/roles/geerlingguy.apache ~/.ansible/roles/pwslab.apache
+      when: not apache_exists.stat.exists
+      ignore_errors: yes
+
+    - name: Applying role PHP
+      command: mv ~/.ansible/roles/geerlingguy.php ~/.ansible/roles/pwslab.php
+      when: not php_exists.stat.exists
+      ignore_errors: yes
+
+    - name: Applying role REMI
+      command: mv ~/.ansible/roles/geerlingguy.repo-remi  ~/.ansible/roles/pwslab.repo-remi 
+      when: not php_exists.stat.exists
+      ignore_errors: yes
+
+    - name: Applying role PHP-Versions
+      command: mv ~/.ansible/roles/geerlingguy.php-versions ~/.ansible/roles/pwslab.php-versions
+      when: not php_exists.stat.exists
+      ignore_errors: yes
+
+    - name: Applying role MYSQL
+      command: mv ~/.ansible/roles/geerlingguy.mysql ~/.ansible/roles/pwslab.mysql
+      when: not mysql_exists.stat.exists
+      ignore_errors: yes
+
+    -   name: Absent the Irrelevant files - Ubuntu 20
+        file:
+          path: /etc/apt/sources.list.d/ansible-ubuntu-ansible-focal.list
+          state: absent
+        when:
+          - os_check.stdout | regex_search("Ubuntu 20")
+
+    - name: Applying replacement on CentOS
+      lineinfile:
+          dest: ~/.ansible/roles/pwslab.php/vars/Debian.yml
+          regexp: '^__php_webserver_daemon: '
+          line: '__php_webserver_daemon: "httpd"'
+          state: present
+      when:
+        - os_check.stdout | regex_search("CentOS")
+    
+    - name: Applying replacement on Ubuntu
+      lineinfile:
+          dest: ~/.ansible/roles/pwslab.php/vars/Debian.yml
+          regexp: '^__php_webserver_daemon: '
+          line: '__php_webserver_daemon: "apache2"'
+          state: present
+      when:
+        - os_check.stdout | regex_search("Ubuntu")
+
+    - name: Installing Apache
+      include_role:
+        name: pwslab.apache
+      when: not apache_exists.stat.exists
+    
+    - name: Installing MYSQL
+      include_role:
+          name: pwslab.mysql
+      when: not mysql_exists.stat.exists
+
+    - name: Installing Remi
+      include_role:
+          name: pwslab.repo-remi 
+      when: os_check.stdout | regex_search("CentOS")
+
+    - name: Installing PHP-Versions
+      include_role:
+          name: pwslab.php-versions
+      when: 
+        - not php_exists.stat.exists
+        - not os_check.stdout | regex_search("CentOS Linux release 8")
+    
+    - name: Installing PHP
+      include_role:
+          name: pwslab.php
+      when: not php_exists.stat.exists
+
+    - name: Installing Rainloop
+      include_role:
+        name: pwslab.rainloop
+    
+    

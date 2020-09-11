@@ -1,0 +1,177 @@
+---
+
+    -   name: Create schema for rainloop
+        shell: mysql -u root -p'root' -e "CREATE SCHEMA rainloop DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;"
+
+    -   name: Import schema for rainloop
+        shell: mysql -u root -p'root' rainloop < /var/www/html/rainloop/app/Schema/Sql/mysql.sql
+
+    -   name: Create DB User rainloop
+        shell: mysql -u root -p'root' -e "CREATE USER 'rainloop'@'localhost' IDENTIFIED BY 'rainloop';"
+
+    -   name: Grant Privs to User rainloop
+        shell: mysql -u root -p'root' -e "GRANT ALL PRIVILEGES ON rainloop.* TO 'rainloop'@'localhost';"
+    
+    -   name: Alter Privs to User rainloop
+        shell: mysql -u root -p'root' -e "ALTER USER rainloop@'localhost' IDENTIFIED WITH mysql_native_password BY 'rainloop';"
+        when:
+            - os_check.stdout | regex_search("Ubuntu 20")
+
+    -   name: Create Rainloop Directory
+        file:
+            path: /var/www/html/rainloop
+            state: directory
+            # recurse: yes
+            # owner: www-data
+            # mode: '0755'
+
+    -   name: Get Rainloop
+        get_url: 
+            url: http://repository.rainloop.net/installer.php
+            dest: /var/www/html/rainloop
+    
+    -   name: Initiate Rainloop
+        shell: php /var/www/html/rainloop/installer.php
+
+    -   name: Grant Permissions
+        file:
+            path: /var/www/html/rainloop
+            recurse: yes
+            owner: www-data
+            mode: '0755'
+        when:
+            - os_check.stdout | regex_search("Ubuntu") 
+
+    -   name: Grant Permissions
+        file:
+            path: /var/www/html/rainloop
+            recurse: yes
+            owner: apache
+            mode: '0755'
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Sets Apache conf file - Ubuntu
+        become: true
+        template:
+            src: "rainloop.conf.j2"
+            dest: "/etc/apache2/sites-available/rainloop.conf"
+        when:
+                - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Disable default config
+        command: a2ensite rainloop.conf
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Disable default config
+        command: a2dissite 000-default.conf
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Install PHP Packages
+        apt: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - php-cli
+            - php-common
+            - php-mbstring
+            - php-gd
+            - php-intl
+            - php-xml
+            - php-mysql
+            - php-zip
+            - php-curl
+            - php-xmlrpc
+            - libapache2-mod-php
+            - php-gd
+            - php-zip
+            - php-curl
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Restart Apache
+        service:
+            name: apache2
+            state: restarted
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Sets Apache conf file - CentOS
+        become: true
+        template:
+            src: "rainloop.conf.j2"
+            dest: "/etc/httpd/conf.d/rainloop.conf"
+        when:
+                - os_check.stdout | regex_search("CentOS")
+
+    -   name: Install PHP Packages
+        yum: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - php-mcrypt
+            - curl
+            - zlib
+            - php-gd
+            - php-mbstring
+            - php-xml
+            - php-mysql
+            - php-zip   
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Enable remi repo - CentOS 7
+        command: yum-config-manager --enable remi-php74
+        when: 
+            - os_check.stdout | regex_search("CentOS Linux 7")
+
+    -   name: Install PHP Packages
+        yum: 
+            name: "{{ item }}" 
+            update_cache: yes 
+            state: present
+        loop: 
+            - curl
+            - zlib
+            - php-gd
+            - php-mbstring
+            - php-xml
+            - php-zip
+            - php-pdo_mysql
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 7")
+
+    -   name: Restart Apache
+        service:
+            name: httpd
+            state: restarted
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Granting Permissions
+        file:
+            path: /var/www/html/rainloop
+            recurse: yes
+            owner: www-data
+            mode: '0777'
+        when:
+            - os_check.stdout | regex_search("Ubuntu") 
+
+    -   name: Granting Permissions
+        file:
+            path: /var/www/html/rainloop
+            recurse: yes
+            owner: apache
+            mode: '0777'
+        when:
+            - os_check.stdout | regex_search("CentOS") 
+
+    -   name: Disable SELinux
+        selinux:
+            state: disabled
+        when:
+            - os_check.stdout | regex_search("CentOS") 
